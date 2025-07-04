@@ -1,0 +1,61 @@
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+metricbeat.modules:
+
+# Системные метрики ОС
+- module: system
+  period: 10s
+  metricsets:
+    - cpu
+    - memory
+    - filesystem
+    - process
+  processes: ['.*']
+
+# Метрики Nginx (предполагается, что вы включили stub_status)
+- module: nginx
+  period: 10s
+  hosts: ["http://nginx:8081/stub_status"]
+  server_status_path: "stub_status"
+  metricsets: ["stubstatus"]
+
+# Метрики PHP-FPM (через status page)
+- module: php_fpm
+  period: 10s
+  hosts: ["http://nginx:8081"]
+  status_path: "/status"
+  metricsets: ["pool"]
+
+# Метрики MySQL
+- module: mysql
+  period: 10s
+  hosts: ["tcp(db:3306)/"]
+  username: "wordpress"
+  password: "w0rdpres$"
+  metricsets: ["status"]
+
+output.elasticsearch:
+  hosts: ["https://192.168.66.155:9200"]
+  username: "elastic"
+  password: "pass"
+  ssl.certificate_authorities: "/usr/share/metricbeat/certs/http_ca.crt"
+  indices:
+    - index: "metricbeat-system-%{+yyyy.MM.dd}"
+      when.equals:
+        event.module: "system"
+
+    - index: "metricbeat-nginx-%{+yyyy.MM.dd}"
+      when.equals:
+        event.module: "nginx"
+
+    - index: "metricbeat-php_fpm-%{+yyyy.MM.dd}"
+      when.equals:
+        event.module: "php_fpm"
+
+    - index: "metricbeat-mysql-%{+yyyy.MM.dd}"
+      when.equals:
+        event.module: "mysql"
+
+    - index: "metricbeat-default-%{+yyyy.MM.dd}"

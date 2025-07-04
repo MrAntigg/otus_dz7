@@ -1,0 +1,62 @@
+filebeat.inputs:
+  # === Nginx access.log — парсим в JSON через grok ===
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/*access.log
+    fields:
+      log_type: nginx-access
+    fields_under_root: true
+    processors:
+      - dissect:
+          tokenizer: '%{remote_addr} - %{remote_user} [%{time_local}] "%{method} %{path} HTTP/%{http_version}" %{status} %{bytes_sent} "%{referer}" "%{user_agent}"'
+          field: "message"
+          target_prefix: ""
+
+  # === Nginx error.log — отправляем как есть ===
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/*error.log
+    fields:
+      log_type: nginx-error
+    fields_under_root: true
+
+  # === MySQL logs — как есть ===
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/mysql/*.log
+    fields:
+      log_type: mysql
+    fields_under_root: true
+
+  # === PHP-FPM logs — как есть ===
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/php-fpm/*.log
+    fields:
+      log_type: php-fpm
+    fields_under_root: true
+
+# === Elasticsearch output с разными индексами ===
+output.elasticsearch:
+  hosts: ["https://192.168.66.155:9200"]
+  username: "elastic"
+  password: "pass"
+  ssl.certificate_authorities: "/usr/share/filebeat/certs/http_ca.crt"
+  indices:
+    - index: "nginx-access-%{+yyyy.MM.dd}"
+      when.contains:
+        log_type: "nginx-access"
+    - index: "nginx-error-%{+yyyy.MM.dd}"
+      when.contains:
+        log_type: "nginx-error"
+    - index: "mysql-%{+yyyy.MM.dd}"
+      when.contains:
+        log_type: "mysql"
+    - index: "php-fpm-%{+yyyy.MM.dd}"
+      when.contains:
+        log_type: "php-fpm"
+    - index: "other-logs-%{+yyyy.MM.dd}"
